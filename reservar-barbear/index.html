@@ -145,6 +145,9 @@ async function init() {
 
     const snapP = await db.collection('negocios').doc(negUid).collection('productos').get();
     servicios = snapP.docs.map(d => ({id:d.id, ...d.data()}));
+    // Solo servicios: se dejan afuera los productos a la venta (insumos / unidades)
+    const soloServ = servicios.filter(s => s.categoria !== 'Insumos' && !(s.tamanos && s.tamanos[0] && s.tamanos[0].nombre === 'Unidad'));
+    if (soloServ.length) servicios = soloServ;
 
     if (!barberos.length) {
       mostrarError('Esta barbería todavía no tiene barberos cargados.');
@@ -186,14 +189,18 @@ function elegirBarbero(id, nombre) {
 }
 
 function renderServicios() {
-  document.getElementById('listaServicios').innerHTML = servicios.map(s => {
+  document.getElementById('listaServicios').innerHTML = servicios.map((s, i) => {
     const precio = s.tamanos && s.tamanos[0] ? s.tamanos[0].precio : 0;
-    return `<button class="opcion-btn" onclick='elegirServicio("${s.id}", ${JSON.stringify(s.nombre)}, ${precio})">
+    return `<button class="opcion-btn" onclick="elegirServicioIdx(${i})">
       ${s.nombre}<span class="sub">$${precio.toLocaleString()}</span>
     </button>`;
   }).join('');
 }
 
+function elegirServicioIdx(i) {
+  const s = servicios[i]; if (!s) return;
+  elegirServicio(s.id, s.nombre, s.tamanos && s.tamanos[0] ? s.tamanos[0].precio : 0);
+}
 function elegirServicio(id, nombre, precio) {
   seleccion.servicioId = id;
   seleccion.servicioNombre = nombre;
