@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
   ARCHIVO: vendedores/index.html
-  VERSIÓN: v1.9
-  FECHA: 02/11/2026
+  VERSIÓN: v2.0
+  FECHA: 08/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
+  - v2.0 (08/11/2026): el panel admin muestra las visitas a la landing /probar/ por código de vendedor (hoy, 7 días, total y por vendedor), junto a los envíos. No toca vendedores ni envíos existentes.
   - v1.9 (03/11/2026): sitio comercial en su propio dominio (ventas.raventechsapp.com) por la alerta de Navegación segura sobre raventechs.github.io; folleto e instructivo de GasAR y manejAr servidos desde el dominio nuevo.
   - v1.8 (02/11/2026): constancia de envíos para el administrador (resumen de hoy/7 días/total, filtros por vendedor y app, planilla CSV, hasta 300 envíos);
     si un envío no se puede registrar queda guardado en el celular del vendedor y se registra solo al volver a entrar; botón "Pasarle la app" por WhatsApp a cada vendedor.
@@ -291,6 +292,13 @@ const datos = {
     try { s = await fb.getDocs(fb.query(fb.collection(fb.db, 'envios'), fb.orderBy('ts', 'desc'), fb.limit(300))); }
     catch (e) { s = await fb.getDocs(fb.collection(fb.db, 'envios')); }
     return s.docs.map(d => { const x = d.data(); return { ...x, ts: x.ts && x.ts.toMillis ? x.ts.toMillis() : (x.enviadoEn || 0) }; }).sort((a, b) => b.ts - a.ts).slice(0, 300);
+  },
+  async listVisitas() {
+    if (MODO_LOCAL) return [];
+    try {
+      const s = await fb.getDocs(fb.query(fb.collection(fb.db, 'visitas'), fb.orderBy('ts', 'desc'), fb.limit(1000)));
+      return s.docs.map(d => d.data());
+    } catch (e) { return null; }   // null = todavía sin permiso (reglas sin publicar)
   }
 };
 // Cada envío deja constancia en la nube. Si no hay conexión, queda guardado en el celular y se registra solo al volver a entrar.
@@ -438,12 +446,13 @@ window.enviar = async () => {
 
 /* ═════════ ADMIN ═════════ */
 window.irAdmin = async () => { vista('vAdmin'); await pintarAdmin(); };
-let enviosCache = [], vendCache = [];
+let enviosCache = [], vendCache = [], visitasCache = [];
 const fechaCorta = ms => ms ? new Date(ms).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 async function pintarAdmin() {
-  vendCache = await datos.listVendedores(); enviosCache = await datos.listEnvios();
+  vendCache = await datos.listVendedores(); enviosCache = await datos.listEnvios(); visitasCache = await datos.listVisitas();
   const cuenta = {}; enviosCache.forEach(e => cuenta[e.vendedorEmail] = (cuenta[e.vendedorEmail] || 0) + 1);
-  $('listaVend').innerHTML = vendCache.length ? vendCache.map(v => `<div class="vend"><div><b>${esc(v.nombre)}</b> · ${esc(v.codigo)}<small>${esc(v.email)} · ${cuenta[v.email] || 0} ${(cuenta[v.email] || 0) === 1 ? 'envío' : 'envíos'}</small></div>
+  const cuentaV = {}; (visitasCache || []).forEach(x => { if (x.cod) cuentaV[x.cod] = (cuentaV[x.cod] || 0) + 1; });
+  $('listaVend').innerHTML = vendCache.length ? vendCache.map(v => `<div class="vend"><div><b>${esc(v.nombre)}</b> · ${esc(v.codigo)}<small>${esc(v.email)} · ${cuenta[v.email] || 0} ${(cuenta[v.email] || 0) === 1 ? 'envío' : 'envíos'}${visitasCache ? ' · ' + (cuentaV[v.codigo] || 0) + ' ' + ((cuentaV[v.codigo] || 0) === 1 ? 'visita' : 'visitas') : ''}</small></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
     <button class="mini" onclick="pasarApp('${esc(v.email)}')">📲 Pasarle la app</button>
     <button class="mini ${v.activo ? 'on' : ''}" onclick="toggleVend('${esc(v.email)}')">${v.activo ? '✅ Activo' : '⏸ Pausado'}</button></div></div>`).join('') : '<p style="color:var(--mut)">Todavía no hay vendedores cargados.</p>';
@@ -462,7 +471,8 @@ async function pintarAdmin() {
   const porApp = {}; enviosCache.forEach(e => { if (e.app) porApp[e.app] = (porApp[e.app] || 0) + 1; });
   const top = Object.entries(porApp).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([n, c]) => esc(n) + ' (' + c + ')').join(' · ');
   $('resumenEnvios').innerHTML = `<p><b>${nHoy}</b> hoy · <b>${n7}</b> en los últimos 7 días · <b>${enviosCache.length}</b> en total (se muestran hasta 300)</p>
-    ${top ? '<p style="color:var(--mut);margin-top:6px">Más enviadas: ' + top + '</p>' : ''}`;
+    ${top ? '<p style="color:var(--mut);margin-top:6px">Más enviadas: ' + top + '</p>' : ''}
+    ${visitasCache === null ? '<p style="color:var(--mut);margin-top:6px">Visitas a la landing: todavía no disponibles (faltan publicar las reglas).</p>' : '<p style="margin-top:6px">👀 Visitas a la landing: <b>' + visitasCache.filter(x => x.ts >= hoy.getTime()).length + '</b> hoy · <b>' + visitasCache.filter(x => x.ts >= Date.now() - 7 * 86400000).length + '</b> en 7 días · <b>' + visitasCache.length + '</b> en total (hasta 1000)</p>'}`;
   pintarEnvios();
 }
 function enviosFiltrados() {

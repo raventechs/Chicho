@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function mail() { return request.auth.token.email != null ? request.auth.token.email.lower() : ''; }
+    function esAdmin() { return request.auth != null && mail() == 'rgaraventa@gmail.com'; }
+    function esVendedor() { return request.auth != null && mail() != '' && exists(/databases/$(database)/documents/vendedores/$(mail())) && get(/databases/$(database)/documents/vendedores/$(mail())).data.activo == true; }
+
+    match /vendedores/{email} {
+      allow read: if esAdmin() || (request.auth != null && mail() == email);
+      allow write: if esAdmin();
+    }
+    match /envios/{id} {
+      allow create: if esVendedor() && request.resource.data.vendedorEmail == mail();
+      allow read: if esAdmin();
+      allow update, delete: if false;
+    }
+    // v2: visitas a la landing /probar/ (las registra cualquier visitante sin login, con campos validados; solo el admin las lee)
+    match /visitas/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['cod', 'appId', 'ts'])
+        && request.resource.data.cod is string && request.resource.data.cod.size() <= 24
+        && request.resource.data.appId is string && request.resource.data.appId.size() <= 20
+        && request.resource.data.ts is number
+        && request.resource.data.ts > request.time.toMillis() - 86400000
+        && request.resource.data.ts < request.time.toMillis() + 86400000;
+      allow read: if esAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,13 +1,13 @@
 <!--
   ARCHIVO: probar/index.html
-  VERSIÓN: v1.0
-  FECHA: 02/11/2026
+  VERSIÓN: v1.1
+  FECHA: 08/11/2026
   PROYECTO: RavenTechs — Landing de entrega instantánea de la prueba (Pilar 1 del embudo de demos)
   CHANGELOG:
+  - v1.1 (08/11/2026): mide las visitas por código de vendedor (colección visitas del proyecto raventech-vendedores, una por sesión y app; si falla no afecta a la página).
   - v1.0 (02/11/2026): una sola página para todas las apps (?app=<id>&ref=<código del vendedor>). Muestra qué es la app,
     los 3 primeros pasos, botón para abrir la prueba (reenvía el código del vendedor), instructivo, folleto y WhatsApp.
   PENDIENTE:
-  - Medir visitas por vendedor (requiere colección en Firestore y reglas)
   - Los datos de las apps salen del catálogo de vendedores/index.html: si cambia allá, regenerar esta página
 -->
 <!DOCTYPE html>
@@ -109,4 +109,18 @@ function landing(a) {
 }
 
 if (APPS[id]) landing(APPS[id]); else lista();
+
+// Medición de visitas por vendedor (una por sesión y app). Nunca rompe la página si falla.
+(function () {
+  try {
+    const appId = APPS[id] ? id : 'lista';
+    const k = 'rt_v_' + appId + '_' + ref;
+    if (sessionStorage.getItem(k)) return;
+    sessionStorage.setItem(k, '1');
+    fetch('https://firestore.googleapis.com/v1/projects/raventech-vendedores/databases/(default)/documents/visitas?key=AIzaSyC4rplGPp-JCUNbUEu0bYgsv1AjVxM84CU', {
+      method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { cod: { stringValue: ref }, appId: { stringValue: appId }, ts: { integerValue: String(Date.now()) } } })
+    }).catch(function () {});
+  } catch (e) {}
+})();
 </script></body></html>
