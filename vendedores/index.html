@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
   ARCHIVO: vendedores/index.html
-  VERSIÓN: v2.0
+  VERSIÓN: v2.1
   FECHA: 08/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
+  - v2.1 (08/11/2026): SEGUIMIENTO HUMANO (Pilar 3 del embudo): cada envío genera una tarea al día 1 (¿pudiste entrar?) y otra al día 3 (¿necesitás ayuda?) con botón de WhatsApp y mensaje armado; el vendedor marca Hecho o No seguir; el admin ve los pendientes de todos. Requiere reglas nuevas (colección seguimientos y lectura de envíos propios). No modifica envíos ni vendedores existentes.
   - v2.0 (08/11/2026): el panel admin muestra las visitas a la landing /probar/ por código de vendedor (hoy, 7 días, total y por vendedor), junto a los envíos. No toca vendedores ni envíos existentes.
   - v1.9 (03/11/2026): sitio comercial en su propio dominio (ventas.raventechsapp.com) por la alerta de Navegación segura sobre raventechs.github.io; folleto e instructivo de GasAR y manejAr servidos desde el dominio nuevo.
   - v1.8 (02/11/2026): constancia de envíos para el administrador (resumen de hoy/7 días/total, filtros por vendedor y app, planilla CSV, hasta 300 envíos);
@@ -85,6 +86,11 @@ th{color:var(--mut);font-weight:600}
 .mini{background:var(--card);border:1px solid var(--ln);color:var(--tx);border-radius:10px;padding:7px 12px;font-size:13px}
 .mini.on{background:#12301f;border-color:#1f6b3b;color:#9be5b4}
 .prev{font-size:13px;color:var(--mut);margin-top:6px}
+.seg{background:#2b2410;border:1px solid #5b4a1a;color:#f2d17a;border-radius:14px;padding:13px 14px;font-weight:700;width:100%;text-align:left;margin-bottom:10px}
+.tarea{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin-top:10px}
+.tarea b{display:block;font-size:16px}.tarea small{display:block;color:var(--mut);margin-top:2px}
+.tarea .acc{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.tarea .acc .btn{margin-top:0;width:auto;flex:1;padding:11px;font-size:15px}
 </style>
 </head>
 <body>
@@ -110,9 +116,17 @@ th{color:var(--mut);font-weight:600}
 
   <!-- CATÁLOGO -->
   <section class="vista" id="vCatalogo">
+    <div id="segBanner"></div>
     <input id="buscar" placeholder="Buscar una app o un rubro…" oninput="pintarCatalogo()">
     <div class="chips" id="cats"></div>
     <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- SEGUIMIENTOS -->
+  <section class="vista" id="vSeg">
+    <button class="volver" onclick="irCatalogo()">← Todas las apps</button>
+    <h2>Clientes para seguir</h2>
+    <div id="listaSeg"></div>
   </section>
 
   <!-- FICHA -->
@@ -136,6 +150,8 @@ th{color:var(--mut);font-weight:600}
       <div id="adminMsg"></div>
     </div>
     <div class="box" id="listaVend"></div>
+    <h2>Seguimiento de clientes</h2>
+    <div class="box" id="resumenSeg"></div>
     <h2>Constancia de envíos</h2>
     <div class="box" id="resumenEnvios"></div>
     <div class="box">
@@ -291,7 +307,25 @@ const datos = {
     let s;
     try { s = await fb.getDocs(fb.query(fb.collection(fb.db, 'envios'), fb.orderBy('ts', 'desc'), fb.limit(300))); }
     catch (e) { s = await fb.getDocs(fb.collection(fb.db, 'envios')); }
-    return s.docs.map(d => { const x = d.data(); return { ...x, ts: x.ts && x.ts.toMillis ? x.ts.toMillis() : (x.enviadoEn || 0) }; }).sort((a, b) => b.ts - a.ts).slice(0, 300);
+    return s.docs.map(d => { const x = d.data(); return { ...x, id: d.id, ts: x.ts && x.ts.toMillis ? x.ts.toMillis() : (x.enviadoEn || 0) }; }).sort((a, b) => b.ts - a.ts).slice(0, 300);
+  },
+  async listEnviosMios() {
+    if (MODO_LOCAL) return ls.get('v_envios', []).map(e => ({ ...e, id: 'l' + e.ts }));
+    const s = await fb.getDocs(fb.query(fb.collection(fb.db, 'envios'), fb.where('vendedorEmail', '==', user.email)));
+    return s.docs.map(d => { const x = d.data(); return { ...x, id: d.id, ts: x.enviadoEn || (x.ts && x.ts.toMillis ? x.ts.toMillis() : 0) }; });
+  },
+  async listSeguimientos() {
+    if (MODO_LOCAL) return ls.get('v_seg', []);
+    try {
+      const col = fb.collection(fb.db, 'seguimientos');
+      const s = await fb.getDocs(user.admin ? col : fb.query(col, fb.where('vendedorEmail', '==', user.email)));
+      return s.docs.map(d => d.data());
+    } catch (e) { return null; }   // null = reglas todavía sin publicar
+  },
+  async marcarSeg(envioId, paso, estado) {
+    const doc = { envioId, paso, estado, vendedorEmail: user.email };
+    if (MODO_LOCAL) { const a = ls.get('v_seg', []); a.push(doc); ls.set('v_seg', a); return; }
+    await fb.setDoc(fb.doc(fb.db, 'seguimientos', envioId + '_' + paso), { ...doc, ts: fb.serverTimestamp() });
   },
   async listVisitas() {
     if (MODO_LOCAL) return [];
@@ -382,7 +416,7 @@ $('btnLocal').onclick = async () => {
 
 /* ═════════ CATÁLOGO Y FICHA ═════════ */
 let rubro = 'Todas', actual = null;
-window.irCatalogo = () => { vista('vCatalogo'); pintarCatalogo(); };
+window.irCatalogo = () => { vista('vCatalogo'); pintarCatalogo(); refrescarSeg(); };
 window.pintarCatalogo = () => {
   $('cats').innerHTML = RUBROS.map(r => `<button class="${r === rubro ? 'on' : ''}" onclick="setRubro('${r}')">${r}</button>`).join('');
   const q = $('buscar').value.trim().toLowerCase();
@@ -474,6 +508,7 @@ async function pintarAdmin() {
     ${top ? '<p style="color:var(--mut);margin-top:6px">Más enviadas: ' + top + '</p>' : ''}
     ${visitasCache === null ? '<p style="color:var(--mut);margin-top:6px">Visitas a la landing: todavía no disponibles (faltan publicar las reglas).</p>' : '<p style="margin-top:6px">👀 Visitas a la landing: <b>' + visitasCache.filter(x => x.ts >= hoy.getTime()).length + '</b> hoy · <b>' + visitasCache.filter(x => x.ts >= Date.now() - 7 * 86400000).length + '</b> en 7 días · <b>' + visitasCache.length + '</b> en total (hasta 1000)</p>'}`;
   pintarEnvios();
+  pintarSegAdmin();
 }
 function enviosFiltrados() {
   const v = $('fVend').value, a = $('fApp').value;
@@ -520,6 +555,74 @@ window.toggleVend = async email => {
   const v = await datos.getVendedor(email); if (!v) return;
   await datos.saveVendedor(email, { ...v, activo: !v.activo }); await pintarAdmin();
 };
+
+/* ═════════ SEGUIMIENTO HUMANO (día 1 y día 3) ═════════ */
+const HORA = 3600000, MAX_SEG_DIAS = 7;
+// Tarea pendiente por envío: día 3 si pasaron 72 h, día 1 si pasaron 24 h; deja de mostrarse a los 7 días o si se marcó "No seguir".
+function calcularPendientes(envios, segs) {
+  const hechos = new Set((segs || []).map(x => x.envioId + '_' + x.paso));
+  const ahora = Date.now(), out = [];
+  (envios || []).forEach(e => {
+    if (!e.id || !e.ts) return;
+    const edad = ahora - e.ts;
+    if (edad > MAX_SEG_DIAS * 86400000 || hechos.has(e.id + '_x')) return;
+    const paso = edad >= 72 * HORA ? 'd3' : edad >= 24 * HORA ? 'd1' : null;
+    if (paso && !hechos.has(e.id + '_' + paso)) out.push({ e, paso, dias: Math.floor(edad / 86400000) });
+  });
+  return out.sort((a, b) => a.e.ts - b.e.ts);
+}
+let segPend = [], segCargado = 0;
+async function refrescarSeg(forzar) {
+  if (!user) return;
+  if (!forzar && Date.now() - segCargado < 60000) { pintarBanner(); return; }
+  try {
+    const [env, segs] = await Promise.all([datos.listEnviosMios(), datos.listSeguimientos()]);
+    segPend = segs === null ? [] : calcularPendientes(env.filter(e => e.vendedorEmail === user.email), segs.filter(x => x.vendedorEmail === user.email));
+    segCargado = Date.now();
+  } catch (e) { segPend = []; }
+  pintarBanner();
+}
+function pintarBanner() {
+  const b = $('segBanner'); if (!b) return;
+  b.innerHTML = segPend.length ? `<button class="seg" onclick="irSeg()">🔔 ${segPend.length} ${segPend.length === 1 ? 'cliente para seguir' : 'clientes para seguir'} hoy · tocá para verlos</button>` : '';
+}
+function mensajeSeg(t) {
+  const nom = (t.e.cliente || '').trim();
+  const hola = `Hola${nom ? ' ' + nom : ''}! Soy ${user.nombre} de RavenTechs.`;
+  return t.paso === 'd1'
+    ? `${hola} Te pasé la prueba gratis de ${t.e.app}. ¿Pudiste entrar? Si algo no se entiende, te ayudo por acá.`
+    : `${hola} ¿Cómo te fue con ${t.e.app}? Si querés, te ayudo a cargar tus primeros datos o la vemos juntos un ratito. ¿Te viene bien?`;
+}
+window.irSeg = async () => { vista('vSeg'); await refrescarSeg(true); pintarSeg(); };
+function pintarSeg() {
+  $('listaSeg').innerHTML = segPend.length ? segPend.map((t, i) => `<div class="tarea">
+      <b>${esc(t.e.cliente || telBonito(t.e.telefono))}</b>
+      <small>${esc(t.e.app)} · enviada hace ${t.dias === 0 ? 'menos de 1 día' : t.dias + (t.dias === 1 ? ' día' : ' días')} · ${t.paso === 'd1' ? 'Día 1: ¿pudo entrar?' : 'Día 3: ¿necesita ayuda?'}</small>
+      <div class="acc">
+        <button class="btn wa" onclick="segWa(${i})">💬 Escribir</button>
+        <button class="btn sec" onclick="segHecho(${i},'hecho')">✅ Hecho</button>
+        <button class="btn sec" onclick="segHecho(${i},'descartado')" style="flex:0 0 100%">🚫 No seguir con este cliente</button>
+      </div></div>`).join('') : '<div class="ok">No tenés seguimientos pendientes. ¡Todo al día!</div>';
+}
+window.segWa = i => { const t = segPend[i]; if (t) window.open('https://wa.me/' + t.e.telefono + '?text=' + encodeURIComponent(mensajeSeg(t)), '_blank'); };
+window.segHecho = async (i, estado) => {
+  const t = segPend[i]; if (!t) return;
+  try { await datos.marcarSeg(t.e.id, estado === 'descartado' ? 'x' : t.paso, estado); } catch (e) { /* ya marcado o sin conexión: se vuelve a mostrar */ }
+  await refrescarSeg(true); pintarSeg();
+};
+// Vista del administrador: pendientes de todos los vendedores
+async function pintarSegAdmin() {
+  const box = $('resumenSeg'); box.innerHTML = '<p style="color:var(--mut)">Cargando…</p>';
+  const segs = await datos.listSeguimientos();
+  if (segs === null) { box.innerHTML = '<p style="color:var(--mut)">Todavía no disponible (faltan publicar las reglas).</p>'; return; }
+  const pend = calcularPendientes(enviosCache, segs);
+  const hechos = segs.filter(x => x.estado === 'hecho').length;
+  const porV = {}; pend.forEach(t => { const k = t.e.vendedor || t.e.vendedorEmail; porV[k] = (porV[k] || 0) + 1; });
+  const res = Object.entries(porV).map(([k, n]) => esc(k) + ' (' + n + ')').join(' · ');
+  box.innerHTML = `<p><b>${pend.length}</b> pendientes · <b>${hechos}</b> seguimientos hechos</p>
+    ${res ? '<p style="color:var(--mut);margin-top:6px">Pendientes por vendedor: ' + res + '</p>' : '<p style="color:var(--mut);margin-top:6px">Nadie tiene seguimientos atrasados.</p>'}
+    ${pend.slice(0, 20).map(t => `<div class="vend"><div><b>${esc(t.e.cliente || telBonito(t.e.telefono))}</b> · ${esc(t.e.app)}<small>${esc(t.e.vendedor || t.e.vendedorEmail)} · ${t.paso === 'd1' ? 'Día 1' : 'Día 3'} · hace ${t.dias} ${t.dias === 1 ? 'día' : 'días'}</small></div></div>`).join('')}`;
+}
 
 /* ═════════ ARRANQUE ═════════ */
 (async function () {

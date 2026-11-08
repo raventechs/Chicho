@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     match /envios/{id} {
       allow create: if esVendedor() && request.resource.data.vendedorEmail == mail();
-      allow read: if esAdmin();
+      allow read: if esAdmin() || (request.auth != null && resource.data.vendedorEmail == mail());
       allow update, delete: if false;
     }
     // v2: visitas a la landing /probar/ (las registra cualquier visitante sin login, con campos validados; solo el admin las lee)
@@ -23,6 +23,17 @@ service cloud.firestore {
         && request.resource.data.ts > request.time.toMillis() - 86400000
         && request.resource.data.ts < request.time.toMillis() + 86400000;
       allow read: if esAdmin();
+      allow update, delete: if false;
+    }
+    // v2.1: seguimiento humano (cada vendedor marca sus tareas; el admin las lee todas)
+    match /seguimientos/{id} {
+      allow create: if (esVendedor() || esAdmin())
+        && request.resource.data.keys().hasOnly(['envioId', 'paso', 'estado', 'vendedorEmail', 'ts'])
+        && request.resource.data.vendedorEmail == mail()
+        && request.resource.data.paso in ['d1', 'd3', 'x']
+        && request.resource.data.estado in ['hecho', 'descartado']
+        && request.resource.data.envioId is string && request.resource.data.envioId.size() <= 40;
+      allow read: if esAdmin() || (request.auth != null && resource.data.vendedorEmail == mail());
       allow update, delete: if false;
     }
   }
