@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
   ARCHIVO: vendedores/index.html
-  VERSIÓN: v2.1
+  VERSIÓN: v2.2
   FECHA: 08/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
+  - v2.2 (08/11/2026): el Admin tiene dos solapas: «Ventas» (lo de siempre) y «Uso de las apps», que abre el Panel de actividad (usuarios, accesos y copias de datos de cada app). No toca datos.
   - v2.1 (08/11/2026): SEGUIMIENTO HUMANO (Pilar 3 del embudo): cada envío genera una tarea al día 1 (¿pudiste entrar?) y otra al día 3 (¿necesitás ayuda?) con botón de WhatsApp y mensaje armado; el vendedor marca Hecho o No seguir; el admin ve los pendientes de todos. Requiere reglas nuevas (colección seguimientos y lectura de envíos propios). No modifica envíos ni vendedores existentes.
   - v2.0 (08/11/2026): el panel admin muestra las visitas a la landing /probar/ por código de vendedor (hoy, 7 días, total y por vendedor), junto a los envíos. No toca vendedores ni envíos existentes.
   - v1.9 (03/11/2026): sitio comercial en su propio dominio (ventas.raventechsapp.com) por la alerta de Navegación segura sobre raventechs.github.io; folleto e instructivo de GasAR y manejAr servidos desde el dominio nuevo.
@@ -86,6 +87,9 @@ th{color:var(--mut);font-weight:600}
 .mini{background:var(--card);border:1px solid var(--ln);color:var(--tx);border-radius:10px;padding:7px 12px;font-size:13px}
 .mini.on{background:#12301f;border-color:#1f6b3b;color:#9be5b4}
 .prev{font-size:13px;color:var(--mut);margin-top:6px}
+.tabs{display:flex;gap:8px;margin:6px 0 4px}
+.tabs button{flex:1;background:var(--card);border:1px solid var(--ln);color:var(--tx);border-radius:12px;padding:11px 8px;font-weight:700;font-size:14px}
+.tabs button.on{background:var(--ac);color:#06101f;border-color:var(--ac)}
 .seg{background:#2b2410;border:1px solid #5b4a1a;color:#f2d17a;border-radius:14px;padding:13px 14px;font-weight:700;width:100%;text-align:left;margin-bottom:10px}
 .tarea{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin-top:10px}
 .tarea b{display:block;font-size:16px}.tarea small{display:block;color:var(--mut);margin-top:2px}
@@ -138,6 +142,19 @@ th{color:var(--mut);font-weight:600}
   <!-- ADMIN -->
   <section class="vista" id="vAdmin">
     <button class="volver" onclick="irCatalogo()">← Volver</button>
+    <div class="tabs">
+      <button id="tabVentas" class="on" onclick="admTab('ventas')">💼 Ventas</button>
+      <button id="tabUso" onclick="admTab('uso')">📊 Uso de las apps</button>
+    </div>
+    <div id="admUso" style="display:none">
+      <h2>Uso de las apps</h2>
+      <div class="box">
+        <p><b>Panel de actividad:</b> para cada app muestra usuarios totales, activos, nuevos de los últimos 7 días e inactivos, con la lista de usuarios y los accesos recientes. También baja una copia completa de los datos de cada app.</p>
+        <p class="prev">Se abre en otra pestaña. Entrá con la cuenta de administrador (rgaraventa@gmail.com).</p>
+        <a class="btn" href="https://raventechs.github.io/panel/" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">📊 Abrir el panel de uso</a>
+      </div>
+    </div>
+    <div id="admVentas">
     <h2>Vendedores</h2>
     <div class="box">
       <label>Correo de Google del vendedor</label>
@@ -161,6 +178,7 @@ th{color:var(--mut);font-weight:600}
       <select id="fApp" onchange="pintarEnvios()"></select>
       <div id="listaEnvios" style="margin-top:10px"></div>
       <button class="btn" onclick="bajarCSV()">⬇ Descargar planilla (CSV)</button>
+    </div>
     </div>
   </section>
 
@@ -479,7 +497,12 @@ window.enviar = async () => {
 };
 
 /* ═════════ ADMIN ═════════ */
-window.irAdmin = async () => { vista('vAdmin'); await pintarAdmin(); };
+window.admTab = t => {
+  $('admVentas').style.display = t === 'ventas' ? 'block' : 'none';
+  $('admUso').style.display = t === 'uso' ? 'block' : 'none';
+  $('tabVentas').classList.toggle('on', t === 'ventas'); $('tabUso').classList.toggle('on', t === 'uso');
+};
+window.irAdmin = async () => { vista('vAdmin'); admTab('ventas'); await pintarAdmin(); };
 let enviosCache = [], vendCache = [], visitasCache = [];
 const fechaCorta = ms => ms ? new Date(ms).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 async function pintarAdmin() {
