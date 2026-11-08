@@ -70,6 +70,7 @@
       <button class="btn-back" onclick="irPaso('servicio')">← Volver</button>
       <div class="step-title">3. Elegí el día</div>
       <input type="date" id="inputFecha" onchange="cargarHorarios()">
+      <button class="btn-primary" style="margin-top:12px" onclick="cargarHorarios()">Ver horarios</button>
     </div>
 
     <!-- PASO 4: HORARIO -->
@@ -211,7 +212,6 @@ function elegirServicio(id, nombre, precio) {
 function irPaso(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step-'+id).classList.add('active');
-  if (id === 'horario') cargarHorarios();
 }
 
 async function cargarHorarios() {
