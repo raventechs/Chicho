@@ -5,7 +5,7 @@
   FECHA: 14/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
-  - v2.4 (14/11/2026): VIDEOS DE VENTA. Las apps de caja con sucursales (CarneAR, PizzAR, PanAR, PuntoVenta, lavAR, BarbeAR) tienen dos videos (Básica con sucursales y Completa) en ventas.raventechsapp.com/videos/. En la ficha: botón «🎬 Videos» y en el envío un selector «Qué le mando» (prueba gratis / video Básica / video Completa) que arma el mensaje de WhatsApp con el link del video. El envío del video se registra con tipo «video» y NO genera tareas de seguimiento. Incluye la v2.3 (Cobranza y Mis ventas).
+  - v2.4 (14/11/2026): VIDEOS DE VENTA. Las apps de caja con sucursales (CarneAR, PizzAR, PanAR, PuntoVenta, lavAR, BarbeAR, PeloteAR) tienen dos videos (Básica con sucursales y Completa) en ventas.raventechsapp.com/videos/. En la ficha: botón «🎬 Videos» y en el envío un selector «Qué le mando» (prueba gratis / video Básica / video Completa) que arma el mensaje de WhatsApp con el link del video. El envío del video se registra con tipo «video» y NO genera tareas de seguimiento. Incluye la v2.3 (Cobranza y Mis ventas).
   - v2.3 (09/11/2026): COBRANZA Y COMISIONES. El admin tiene la solapa «Cobranza»: lista de clientes por cobrar con estado de la prueba (día X de 14), botones «Cobrado Básico» / «Cobrado Full» (sin escribir montos), comisión del vendedor calculada sola (40% del alta), liquidación mensual con un botón por vendedor, aviso por WhatsApp, deshacer un cobro por error y planilla CSV. Cada vendedor tiene «Mis ventas»: sus clientes, en qué estado está cada prueba, cuántos pagaron y cuánta comisión tiene pendiente o ya liquidada. Requiere reglas nuevas (colección altas). No modifica envíos, vendedores, visitas ni seguimientos existentes.
   - v2.2 (08/11/2026): el Admin tiene dos solapas: «Ventas» (lo de siempre) y «Uso de las apps», que abre el Panel de actividad (usuarios, accesos y copias de datos de cada app). No toca datos.
   - v2.1 (08/11/2026): SEGUIMIENTO HUMANO (Pilar 3 del embudo): cada envío genera una tarea al día 1 (¿pudiste entrar?) y otra al día 3 (¿necesitás ayuda?) con botón de WhatsApp y mensaje armado; el vendedor marca Hecho o No seguir; el admin ve los pendientes de todos. Requiere reglas nuevas (colección seguimientos y lectura de envíos propios). No modifica envíos ni vendedores existentes.
@@ -257,7 +257,7 @@ const APPS = [
     d:'La barbería maneja su caja y sus turnos, y el cliente reserva solo desde un link, sin mensajes ni llamadas.',
     b:['Reservas online por link','Agenda y caja en un solo lugar','Menos ausencias y menos mensajes'],
     url:D('barbear'), demo:D('barbear'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-barbear.html', ayuda:D('barbear')+'ayuda/' },
-  { id:'pelotear', n:'PeloteAR', e:'⚽', r:'Servicios', t:'Reservas de canchas', ok:true,
+  { id:'pelotear', video:true, n:'PeloteAR', e:'⚽', r:'Servicios', t:'Reservas de canchas', ok:true,
     d:'Complejos de canchas de fútbol 5, 7 y 11, pádel y tenis: reservas, precios de día y de noche, buffet y cierre de caja.',
     b:['Reservas y turnos fijos','Precio diurno y nocturno','Buffet y cierre de caja'],
     url:D('pelotear'), demo:D('pelotear')+'demo/', ficha:'https://ventas.raventechsapp.com/folletos/folleto-pelotear.html', ayuda:D('pelotear')+'ayuda/' },

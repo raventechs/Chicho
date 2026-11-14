@@ -42,10 +42,11 @@ video{width:100%;max-height:72vh;border-radius:16px;background:#000;border:1px s
 </div>
 <script>
 // id de app -> [nombre, rubro del video]
-var APPS={carnear:['CarneAR','carne'],pizzar:['PizzAR','pizza'],panar:['PanAR','pan'],puntoventa:['PuntoVenta','pv'],lavar:['lavAR','lav'],barbear:['BarbeAR','barbe']};
+var APPS={carnear:['CarneAR','carne'],pizzar:['PizzAR','pizza'],panar:['PanAR','pan'],puntoventa:['PuntoVenta','pv'],lavar:['lavAR','lav'],barbear:['BarbeAR','barbe'],pelotear:['PeloteAR','pelo']};
 var q=new URLSearchParams(location.search),id=(q.get('app')||'carnear').toLowerCase(),ref=q.get('ref')||'';
 var a=APPS[id]||APPS.carnear; if(!APPS[id]) id='carnear';
-var DESC={basica:'Versión Básica con sucursales: el dueño ve sus dos locales, un cobro en caja, el histórico de ventas y el resumen por WhatsApp.',completa:'Versión Completa: todo lo anterior más la carga de un gasto y el control de stock.'};
+var DESC={basica:'Versión Básica con sucursales: el dueño ve todas sus sucursales juntas, un cobro en caja, el histórico de ventas y el resumen por WhatsApp.',completa:'Versión Completa: todo lo anterior más la carga de un gasto y el control de stock.'};
+if(id==='pelotear')DESC={basica:'Versión Básica con predios: ves todos tus predios juntos, cargás una reserva, mirás el historial de reservas y mandás el resumen por WhatsApp.',completa:'Versión Completa: todo lo anterior más la carga de un gasto y el stock del buffet.'};
 function $(i){return document.getElementById(i)}
 function ver(v){
   if(v!=='completa') v='basica';
