@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <!--
   ARCHIVO: vendedores/index.html
-  VERSIÓN: v2.2
-  FECHA: 08/11/2026
+  VERSIÓN: v2.4
+  FECHA: 14/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
+  - v2.4 (14/11/2026): VIDEOS DE VENTA. Las apps de caja con sucursales (CarneAR, PizzAR, PanAR, PuntoVenta, lavAR, BarbeAR) tienen dos videos (Básica con sucursales y Completa) en ventas.raventechsapp.com/videos/. En la ficha: botón «🎬 Videos» y en el envío un selector «Qué le mando» (prueba gratis / video Básica / video Completa) que arma el mensaje de WhatsApp con el link del video. El envío del video se registra con tipo «video» y NO genera tareas de seguimiento. Incluye la v2.3 (Cobranza y Mis ventas).
+  - v2.3 (09/11/2026): COBRANZA Y COMISIONES. El admin tiene la solapa «Cobranza»: lista de clientes por cobrar con estado de la prueba (día X de 14), botones «Cobrado Básico» / «Cobrado Full» (sin escribir montos), comisión del vendedor calculada sola (40% del alta), liquidación mensual con un botón por vendedor, aviso por WhatsApp, deshacer un cobro por error y planilla CSV. Cada vendedor tiene «Mis ventas»: sus clientes, en qué estado está cada prueba, cuántos pagaron y cuánta comisión tiene pendiente o ya liquidada. Requiere reglas nuevas (colección altas). No modifica envíos, vendedores, visitas ni seguimientos existentes.
   - v2.2 (08/11/2026): el Admin tiene dos solapas: «Ventas» (lo de siempre) y «Uso de las apps», que abre el Panel de actividad (usuarios, accesos y copias de datos de cada app). No toca datos.
   - v2.1 (08/11/2026): SEGUIMIENTO HUMANO (Pilar 3 del embudo): cada envío genera una tarea al día 1 (¿pudiste entrar?) y otra al día 3 (¿necesitás ayuda?) con botón de WhatsApp y mensaje armado; el vendedor marca Hecho o No seguir; el admin ve los pendientes de todos. Requiere reglas nuevas (colección seguimientos y lectura de envíos propios). No modifica envíos ni vendedores existentes.
   - v2.0 (08/11/2026): el panel admin muestra las visitas a la landing /probar/ por código de vendedor (hoy, 7 días, total y por vendedor), junto a los envíos. No toca vendedores ni envíos existentes.
@@ -22,7 +24,8 @@
     al teléfono que el vendedor escriba, ingreso con Google solo para vendedores autorizados, código de vendedor en cada link,
     registro de envíos y panel de administración con botones. Modo prueba local mientras no esté cargada la configuración de Firebase.
   PENDIENTE:
-    - Crear el proyecto de Firebase de vendedores, pegar su configuración en FIREBASE_CONFIG y publicar qa/rules/vendedores.rules (repo gasar).
+    - Publicar las reglas v2.2 (colección altas) en Firebase de raventech-vendedores.
+    - Cargar en PLANES los precios definitivos y en LINKS_PAGO los links de Mercado Pago cuando estén creados.
 -->
 <html lang="es">
 <head>
@@ -95,12 +98,25 @@ th{color:var(--mut);font-weight:600}
 .tarea b{display:block;font-size:16px}.tarea small{display:block;color:var(--mut);margin-top:2px}
 .tarea .acc{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .tarea .acc .btn{margin-top:0;width:auto;flex:1;padding:11px;font-size:15px}
+header h1{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:430px){header{gap:6px;padding:10px 12px}header .chip{padding:7px 10px;font-size:12px}header h1{font-size:15px}}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kpi{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px}
+.kpi b{display:block;font-size:20px}.kpi small{color:var(--mut);font-size:12px}
+.est{display:inline-block;font-size:12px;border-radius:99px;padding:2px 9px;background:#1b2740;color:var(--ac);margin-top:4px}
+.est.pago{background:#12301f;color:#9be5b4}.est.venc{background:#3a2f12;color:var(--a)}
+.cob{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin-top:10px}
+.cob b{display:block;font-size:16px}.cob small{display:block;color:var(--mut);margin-top:2px}
+.cob .acc{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.cob .acc button{flex:1;min-width:130px;border:none;border-radius:10px;padding:11px;font-weight:800;font-size:14px}
+.cob .acc .b1{background:var(--ac);color:#06101f}.cob .acc .b2{background:var(--v);color:#04210f}.cob .acc .b3{background:transparent;border:1px solid var(--ln);color:var(--tx);font-weight:600}
 </style>
 </head>
 <body>
 <header>
   <img src="icon-192.png" alt="">
   <h1>RavenTechs · Vendedores</h1>
+  <button class="chip" id="chipMis" style="display:none" onclick="irMis()">💰 Mis ventas</button>
   <button class="chip" id="chipAdmin" style="display:none" onclick="irAdmin()">⚙️ Admin</button>
   <button class="chip" id="chipSalir" style="display:none" onclick="salir()">Salir</button>
 </header>
@@ -139,13 +155,22 @@ th{color:var(--mut);font-weight:600}
     <div id="fichaBody"></div>
   </section>
 
+  <!-- MIS VENTAS (cada vendedor) -->
+  <section class="vista" id="vMis">
+    <button class="volver" onclick="irCatalogo()">← Todas las apps</button>
+    <h2>Mis ventas</h2>
+    <div id="misBody"></div>
+  </section>
+
   <!-- ADMIN -->
   <section class="vista" id="vAdmin">
     <button class="volver" onclick="irCatalogo()">← Volver</button>
     <div class="tabs">
       <button id="tabVentas" class="on" onclick="admTab('ventas')">💼 Ventas</button>
-      <button id="tabUso" onclick="admTab('uso')">📊 Uso de las apps</button>
+      <button id="tabCob" onclick="admTab('cobranza')">💰 Cobranza</button>
+      <button id="tabUso" onclick="admTab('uso')">📊 Uso</button>
     </div>
+    <div id="admCobranza" style="display:none"></div>
     <div id="admUso" style="display:none">
       <h2>Uso de las apps</h2>
       <div class="box">
@@ -197,32 +222,38 @@ const FIREBASE_CONFIG = {
   appId: "1:1097885314847:web:83201fd76b47fccb004a2a"
 };
 const ADMIN_EMAIL = 'rgaraventa@gmail.com';
+/* Modelo comercial (decidido el 09/11/2026). Para cambiar un precio o el porcentaje se cambia solo acá. */
+const PLANES = { basico: { n: 'Básico', monto: 80000 }, full: { n: 'Full', monto: 120000 } };   // alta, pago único, en pesos
+const COMISION_PCT = 40;          // % del alta que cobra el vendedor (solo sobre el alta, no sobre el mensual)
+const DIAS_PRUEBA = 14;           // duración de la prueba gratis
+const DIAS_POR_COBRAR = 60;       // cuántos días de envíos se muestran en «Por cobrar»
+const $$ = n => '$' + Math.round(n || 0).toLocaleString('es-AR');
 const MODO_LOCAL = !FIREBASE_CONFIG.apiKey;
 
 /* ═════════ CATÁLOGO ═════════ */
 const D = (dom) => 'https://' + dom + '.raventechsapp.com/';
 const APPS = [
-  { id:'carnear', n:'CarneAR', e:'🥩', r:'Comercio', t:'Caja para carnicerías', ok:true,
+  { id:'carnear', video:true, n:'CarneAR', e:'🥩', r:'Comercio', t:'Caja para carnicerías', ok:true,
     d:'Sistema de caja pensado para carnicerías: vende por unidad o por peso, controla el stock, los gastos y el cierre de caja, y suma sucursales cuando el negocio crece.',
     b:['Cobro rápido con varios medios de pago','Cierre de caja y gastos del día','Varias sucursales y cajeros con su propio acceso'],
     url:D('carnear'), demo:D('carnear'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-carnear.html', ayuda:D('carnear')+'ayuda/' },
-  { id:'pizzar', n:'PizzAR', e:'🍕', r:'Comercio', t:'Caja y comandas para pizzerías', ok:true,
+  { id:'pizzar', video:true, n:'PizzAR', e:'🍕', r:'Comercio', t:'Caja y comandas para pizzerías', ok:true,
     d:'Desde la comanda hasta el cierre de caja: la pizzería anota los pedidos, cobra, controla los gastos y recibe el resumen del día por WhatsApp.',
     b:['Comandas y pedidos ordenados','Cierre de caja enviado por WhatsApp','Cajeros con acceso por link'],
     url:D('pizzar'), demo:D('pizzar'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-pizzar.html', ayuda:D('pizzar')+'ayuda/' },
-  { id:'panar', n:'PanAR', e:'🥖', r:'Comercio', t:'Caja para panaderías', ok:true,
+  { id:'panar', video:true, n:'PanAR', e:'🥖', r:'Comercio', t:'Caja para panaderías', ok:true,
     d:'La panadería organiza ventas, gastos y cierre de caja desde el celular, con el resumen del turno listo para enviar.',
     b:['Ventas y gastos del día','Cierre de caja por WhatsApp','Cajeros por sucursal'],
     url:D('panar'), demo:D('panar'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-panar.html', ayuda:D('panar')+'ayuda/' },
-  { id:'puntoventa', n:'PuntoVenta', e:'🏪', r:'Comercio', t:'Punto de venta multi-sucursal', ok:true,
+  { id:'puntoventa', video:true, n:'PuntoVenta', e:'🏪', r:'Comercio', t:'Punto de venta multi-sucursal', ok:true,
     d:'Para negocios con varios locales: ventas, compras y gastos desde el celular, cuenta corriente de clientes con control de morosidad y visibilidad en tiempo real para el dueño.',
     b:['Hasta 30 sucursales','Cuenta corriente y morosidad','El dueño ve todo en tiempo real'],
     url:D('puntoventa'), demo:D('puntoventa'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-puntoventa.html', ayuda:D('puntoventa')+'ayuda/' },
-  { id:'lavar', n:'lavAR', e:'🚗', r:'Servicios', t:'Lavaderos con fidelización por patente', ok:true,
+  { id:'lavar', video:true, n:'lavAR', e:'🚗', r:'Servicios', t:'Lavaderos con fidelización por patente', ok:true,
     d:'El lavadero registra cada servicio por patente, fideliza a sus clientes con beneficios y maneja sucursales, empleados y gastos.',
     b:['Fidelización automática por patente','Sucursales, gastos y empleados','Caja y reportes del día'],
     url:D('lavar'), demo:D('lavar'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-lavar.html', ayuda:D('lavar')+'ayuda/' },
-  { id:'barbear', n:'BarbeAR', e:'💈', r:'Servicios', t:'Turnos y caja para barberías', ok:true,
+  { id:'barbear', video:true, n:'BarbeAR', e:'💈', r:'Servicios', t:'Turnos y caja para barberías', ok:true,
     d:'La barbería maneja su caja y sus turnos, y el cliente reserva solo desde un link, sin mensajes ni llamadas.',
     b:['Reservas online por link','Agenda y caja en un solo lugar','Menos ausencias y menos mensajes'],
     url:D('barbear'), demo:D('barbear'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-barbear.html', ayuda:D('barbear')+'ayuda/' },
@@ -345,6 +376,28 @@ const datos = {
     if (MODO_LOCAL) { const a = ls.get('v_seg', []); a.push(doc); ls.set('v_seg', a); return; }
     await fb.setDoc(fb.doc(fb.db, 'seguimientos', envioId + '_' + paso), { ...doc, ts: fb.serverTimestamp() });
   },
+  async listAltas() {   // admin: todas. null = reglas todavía sin publicar
+    if (MODO_LOCAL) return ls.get('v_altas', []);
+    try { const s = await fb.getDocs(fb.collection(fb.db, 'altas')); return s.docs.map(d => normAlta(d.id, d.data())); }
+    catch (e) { return null; }
+  },
+  async listAltasMias() {
+    if (MODO_LOCAL) return ls.get('v_altas', []).filter(a => a.vendedorEmail === user.email);
+    try { const s = await fb.getDocs(fb.query(fb.collection(fb.db, 'altas'), fb.where('vendedorEmail', '==', user.email))); return s.docs.map(d => normAlta(d.id, d.data())); }
+    catch (e) { return null; }
+  },
+  async marcarAlta(a) {
+    if (MODO_LOCAL) { const all = ls.get('v_altas', []).filter(x => x.envioId !== a.envioId); all.push({ ...a, pagadoTs: Date.now() }); ls.set('v_altas', all); return; }
+    await fb.setDoc(fb.doc(fb.db, 'altas', a.envioId), { ...a, pagadoTs: fb.serverTimestamp() });
+  },
+  async liquidarAlta(id) {
+    if (MODO_LOCAL) { const all = ls.get('v_altas', []); all.forEach(x => { if (x.envioId === id) { x.liquidada = true; x.liquidadaTs = Date.now(); } }); ls.set('v_altas', all); return; }
+    await fb.updateDoc(fb.doc(fb.db, 'altas', id), { liquidada: true, liquidadaTs: fb.serverTimestamp() });
+  },
+  async deshacerAlta(id) {
+    if (MODO_LOCAL) { ls.set('v_altas', ls.get('v_altas', []).filter(x => x.envioId !== id)); return; }
+    await fb.deleteDoc(fb.doc(fb.db, 'altas', id));
+  },
   async listVisitas() {
     if (MODO_LOCAL) return [];
     try {
@@ -353,6 +406,10 @@ const datos = {
     } catch (e) { return null; }   // null = todavía sin permiso (reglas sin publicar)
   }
 };
+function normAlta(id, x) {
+  const t = v => v && v.toMillis ? v.toMillis() : (typeof v === 'number' ? v : 0);
+  return { ...x, envioId: x.envioId || id, pagadoTs: t(x.pagadoTs), liquidadaTs: t(x.liquidadaTs), liquidada: x.liquidada === true };
+}
 // Cada envío deja constancia en la nube. Si no hay conexión, queda guardado en el celular y se registra solo al volver a entrar.
 const PEND = 'v_pend';
 async function registrarEnvio(e) {
@@ -405,12 +462,13 @@ async function entrar(u) {
   reintentarPendientes();
   $('chipSalir').style.display = 'inline-block';
   $('chipAdmin').style.display = admin ? 'inline-block' : 'none';
+  $('chipMis').style.display = 'inline-block';
   irCatalogo();
 }
 window.salir = async () => {
   if (fb && fb.auth.currentUser) await fb.signOut(fb.auth);
   user = null; ls.set('v_local_user', null);
-  $('chipSalir').style.display = 'none'; $('chipAdmin').style.display = 'none';
+  $('chipSalir').style.display = 'none'; $('chipAdmin').style.display = 'none'; $('chipMis').style.display = 'none';
   vista('vLogin');
 };
 $('btnGoogle').onclick = async () => {
@@ -429,7 +487,7 @@ $('btnGoogle').onclick = async () => {
 };
 $('btnLocal').onclick = async () => {
   user = { email: 'prueba@local', nombre: 'Vendedor de prueba', codigo: 'PRUEBA', admin: true };
-  $('chipSalir').style.display = 'inline-block'; $('chipAdmin').style.display = 'inline-block'; irCatalogo();
+  $('chipSalir').style.display = 'inline-block'; $('chipAdmin').style.display = 'inline-block'; $('chipMis').style.display = 'inline-block'; irCatalogo();
 };
 
 /* ═════════ CATÁLOGO Y FICHA ═════════ */
@@ -452,15 +510,17 @@ window.abrirFicha = id => {
     <div class="ficha-h"><span class="em">${a.e}</span><div><h3>${esc(a.n)}</h3><p>${esc(a.t)}</p></div></div>
     ${a.ok ? '' : '<div class="aviso">Esta app todavía está en desarrollo: se puede mostrar, pero no enviar como prueba.</div>'}
     <div class="box"><p>${esc(a.d)}</p><ul>${a.b.map(x => '<li>' + esc(x) + '</li>').join('')}</ul></div>
-    <div class="links">${link(a.demo, '▶ Ver demo')}${link(a.ayuda, '📖 Instructivo')}${link(a.ficha, '📄 Folleto')}</div>
+    <div class="links">${link(a.demo, '▶ Ver demo')}${a.video ? link(videoLink('basica'), '🎬 Videos') : ''}${link(a.ayuda, '📖 Instructivo')}${link(a.ficha, '📄 Folleto')}</div>
     ${a.ok ? `
-    <h2>Enviar la prueba por WhatsApp</h2>
+    <h2>${a.video ? "Enviar por WhatsApp" : "Enviar la prueba por WhatsApp"}</h2>
     <div class="box">
       <label>Teléfono del cliente</label>
       <input id="tel" type="tel" inputmode="tel" placeholder="Ej: 11 2345 6789" oninput="actualizarMensaje()">
       <div class="prev" id="telPrev"></div>
       <label>Nombre del cliente (opcional)</label>
       <input id="cliNombre" placeholder="Ej: Marcela" oninput="actualizarMensaje()">
+      ${a.video ? `<label>Qué le mando</label>
+      <select id="queMando" onchange="actualizarMensaje(true)"><option value="prueba">🎁 La prueba gratis (link + instructivo)</option><option value="basica">🎬 Video: versión Básica con sucursales</option><option value="completa">🎬 Video: versión Completa</option></select>` : ''}
       <label>Mensaje (lo podés editar)</label>
       <textarea id="msg"></textarea>
       <div class="aviso" id="envMsg" style="display:none"></div>
@@ -472,6 +532,9 @@ function linkConCodigo() {
   // El cliente llega a la landing de la prueba (explica qué hacer) y desde ahí abre la app con el mismo código de vendedor.
   return 'https://ventas.raventechsapp.com/probar/?app=' + encodeURIComponent(actual.id) + '&ref=' + encodeURIComponent(user ? user.codigo : '');
 }
+function videoLink(v) {
+  return 'https://ventas.raventechsapp.com/videos/?app=' + encodeURIComponent(actual.id) + '&v=' + encodeURIComponent(v) + '&ref=' + encodeURIComponent(user ? user.codigo : '');
+}
 let msgEditado = false;
 window.actualizarMensaje = (inicial) => {
   const t = normTel($('tel').value);
@@ -479,7 +542,10 @@ window.actualizarMensaje = (inicial) => {
   if (inicial) msgEditado = false;
   if (!msgEditado) {
     const nom = $('cliNombre').value.trim();
-    $('msg').value = `Hola${nom ? ' ' + nom : ''}! Soy ${user.nombre} de RavenTechs. Te paso la prueba gratis de ${actual.n} (${actual.t.toLowerCase()}):\n${linkConCodigo()}\n${actual.ayuda ? '\nAcá tenés el instructivo paso a paso:\n' + actual.ayuda + '\n' : ''}\nPodés probarla 14 días desde el celular, sin instalar nada. Si te interesa o tenés dudas, escribime por acá.`;
+    const q = $('queMando') ? $('queMando').value : 'prueba';
+    if (q !== 'prueba') {
+      $('msg').value = `Hola${nom ? ' ' + nom : ''}! Soy ${user.nombre} de RavenTechs. Mirá en un par de minutos cómo se usa ${actual.n} (${q === 'basica' ? 'versión Básica con sucursales' : 'versión Completa'}):\n${videoLink(q)}\n\nSi te gusta, la podés probar gratis 14 días:\n${linkConCodigo()}`;
+    } else $('msg').value = `Hola${nom ? ' ' + nom : ''}! Soy ${user.nombre} de RavenTechs. Te paso la prueba gratis de ${actual.n} (${actual.t.toLowerCase()}):\n${linkConCodigo()}\n${actual.ayuda ? '\nAcá tenés el instructivo paso a paso:\n' + actual.ayuda + '\n' : ''}\nPodés probarla 14 días desde el celular, sin instalar nada. Si te interesa o tenés dudas, escribime por acá.`;
   }
 };
 document.addEventListener('input', e => { if (e.target && e.target.id === 'msg') msgEditado = true; });
@@ -489,7 +555,10 @@ window.enviar = async () => {
   if (tel.length < 11 || tel.length > 15) { box.textContent = 'Revisá el teléfono: tiene que incluir el código de área (por ejemplo 11 2345 6789).'; return; }
   if (!m) { box.textContent = 'El mensaje no puede estar vacío.'; return; }
   $('btnEnviar').disabled = true;
-  const registrado = await registrarEnvio({ vendedorEmail: user.email, vendedor: user.nombre, codigo: user.codigo, appId: actual.id, app: actual.n, telefono: tel, cliente: $('cliNombre').value.trim() });
+  const q = $('queMando') ? $('queMando').value : 'prueba';
+  const registrado = await registrarEnvio(q === 'prueba'
+    ? { vendedorEmail: user.email, vendedor: user.nombre, codigo: user.codigo, appId: actual.id, app: actual.n, telefono: tel, cliente: $('cliNombre').value.trim() }
+    : { vendedorEmail: user.email, vendedor: user.nombre, codigo: user.codigo, appId: actual.id, app: actual.n + ' · video', tipo: 'video-' + q, telefono: tel, cliente: $('cliNombre').value.trim() });
   if (registrado) { box.className = 'ok'; box.textContent = 'Listo: se abrió WhatsApp con el mensaje y el envío quedó registrado. Tocá enviar allá.'; }
   else { box.textContent = 'Se abrió WhatsApp, pero el envío no se pudo registrar ahora. Quedó guardado en tu celular y se registra solo la próxima vez que entres.'; }
   window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(m), '_blank');
@@ -499,8 +568,10 @@ window.enviar = async () => {
 /* ═════════ ADMIN ═════════ */
 window.admTab = t => {
   $('admVentas').style.display = t === 'ventas' ? 'block' : 'none';
+  $('admCobranza').style.display = t === 'cobranza' ? 'block' : 'none';
   $('admUso').style.display = t === 'uso' ? 'block' : 'none';
-  $('tabVentas').classList.toggle('on', t === 'ventas'); $('tabUso').classList.toggle('on', t === 'uso');
+  $('tabVentas').classList.toggle('on', t === 'ventas'); $('tabCob').classList.toggle('on', t === 'cobranza'); $('tabUso').classList.toggle('on', t === 'uso');
+  if (t === 'cobranza') pintarCobranza();
 };
 window.irAdmin = async () => { vista('vAdmin'); admTab('ventas'); await pintarAdmin(); };
 let enviosCache = [], vendCache = [], visitasCache = [];
@@ -586,7 +657,7 @@ function calcularPendientes(envios, segs) {
   const hechos = new Set((segs || []).map(x => x.envioId + '_' + x.paso));
   const ahora = Date.now(), out = [];
   (envios || []).forEach(e => {
-    if (!e.id || !e.ts) return;
+    if (!e.id || !e.ts || (e.tipo && String(e.tipo).indexOf('video') === 0)) return;   // v2.4: enviar un video no es enviar la prueba
     const edad = ahora - e.ts;
     if (edad > MAX_SEG_DIAS * 86400000 || hechos.has(e.id + '_x')) return;
     const paso = edad >= 72 * HORA ? 'd3' : edad >= 24 * HORA ? 'd1' : null;
@@ -646,6 +717,134 @@ async function pintarSegAdmin() {
     ${res ? '<p style="color:var(--mut);margin-top:6px">Pendientes por vendedor: ' + res + '</p>' : '<p style="color:var(--mut);margin-top:6px">Nadie tiene seguimientos atrasados.</p>'}
     ${pend.slice(0, 20).map(t => `<div class="vend"><div><b>${esc(t.e.cliente || telBonito(t.e.telefono))}</b> · ${esc(t.e.app)}<small>${esc(t.e.vendedor || t.e.vendedorEmail)} · ${t.paso === 'd1' ? 'Día 1' : 'Día 3'} · hace ${t.dias} ${t.dias === 1 ? 'día' : 'días'}</small></div></div>`).join('')}`;
 }
+
+/* ═════════ COBRANZA Y COMISIONES (v2.3) ═════════ */
+// Estado de la prueba, estimado desde el día del envío (la cuenta real arranca cuando el cliente entra por primera vez).
+function estadoPrueba(e, alta) {
+  if (alta) return { cls: 'pago', txt: '✅ Pagó el plan ' + ((PLANES[alta.plan] || {}).n || alta.plan) };
+  if (!e.ts) return { cls: '', txt: 'En prueba' };
+  const dia = Math.floor((Date.now() - e.ts) / 86400000) + 1;
+  if (dia <= DIAS_PRUEBA) return { cls: '', txt: 'En prueba · día ' + dia + ' de ' + DIAS_PRUEBA };
+  const v = dia - DIAS_PRUEBA;
+  return { cls: 'venc', txt: 'Prueba vencida hace ' + v + (v === 1 ? ' día' : ' días') };
+}
+const comisionDe = plan => Math.round(((PLANES[plan] || { monto: 0 }).monto) * COMISION_PCT / 100);
+const inicioMes = () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const fechaDia = ms => ms ? new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '—';
+
+// ── Vendedor: «Mis ventas»
+window.irMis = async () => { vista('vMis'); await pintarMis(); };
+async function pintarMis() {
+  const box = $('misBody'); box.innerHTML = '<p style="color:var(--mut)">Cargando…</p>';
+  let env = [], altas = null;
+  try { env = await datos.listEnviosMios(); } catch (e) {}
+  try { altas = await datos.listAltasMias(); } catch (e) { altas = null; }
+  env = env.filter(e => e.vendedorEmail === user.email).sort((a, b) => b.ts - a.ts);
+  const porEnvio = new Map((altas || []).map(a => [a.envioId, a]));
+  const pendiente = (altas || []).filter(a => !a.liquidada).reduce((n, a) => n + (a.comision || 0), 0);
+  const cobrado = (altas || []).filter(a => a.liquidada).reduce((n, a) => n + (a.comision || 0), 0);
+  const enPrueba = env.filter(e => !porEnvio.has(e.id) && e.ts && (Date.now() - e.ts) < DIAS_PRUEBA * 86400000).length;
+  box.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><b>${env.length}</b><small>pruebas enviadas</small></div>
+      <div class="kpi"><b>${enPrueba}</b><small>en prueba ahora</small></div>
+      <div class="kpi"><b>${(altas || []).length}</b><small>clientes que pagaron</small></div>
+      <div class="kpi"><b>${$$(pendiente)}</b><small>comisión a liquidar</small></div>
+    </div>
+    ${altas === null ? '<div class="aviso">Todavía no se pueden mostrar tus comisiones. Avisale a Ruben.</div>' : ''}
+    <p class="prev">Tu comisión es el ${COMISION_PCT}% del alta de cada cliente que paga, y se liquida una vez por mes.${cobrado ? ' Ya te liquidaron en total ' + $$(cobrado) + '.' : ''}</p>
+    <h2>Mis clientes</h2>
+    ${env.length ? env.slice(0, 60).map(e => {
+      const a = porEnvio.get(e.id), st = estadoPrueba(e, a);
+      return `<div class="cob"><b>${esc(e.cliente || telBonito(e.telefono))}</b>
+        <small>${esc(e.app)} · enviada el ${fechaDia(e.ts)}${e.cliente ? ' · ' + esc(telBonito(e.telefono)) : ''}</small>
+        <span class="est ${st.cls}">${st.txt}</span>
+        ${a ? `<small>Tu comisión: <b style="display:inline">${$$(a.comision)}</b> · ${a.liquidada ? 'ya liquidada' : 'a liquidar a fin de mes'}</small>` : ''}</div>`;
+    }).join('') : '<div class="aviso" style="background:#1b2740;color:var(--tx)">Todavía no enviaste ninguna prueba. Elegí una app y mandásela a tu primer cliente.</div>'}`;
+}
+
+// ── Administrador: solapa «Cobranza»
+let altasCache = [], porCobrar = [];
+async function pintarCobranza() {
+  const box = $('admCobranza'); box.innerHTML = '<p style="color:var(--mut);padding:12px 0">Cargando…</p>';
+  if (!enviosCache.length) { try { enviosCache = await datos.listEnvios(); } catch (e) {} }
+  if (!vendCache.length) { try { vendCache = await datos.listVendedores(); } catch (e) {} }
+  altasCache = await datos.listAltas();
+  if (altasCache === null) { box.innerHTML = '<div class="aviso">Todavía no disponible: faltan publicar las reglas nuevas (colección altas) en Firebase.</div>'; return; }
+  const mes = inicioMes();
+  const delMes = altasCache.filter(a => a.pagadoTs >= mes);
+  const brutoMes = delMes.reduce((n, a) => n + (a.monto || 0), 0), comMes = delMes.reduce((n, a) => n + (a.comision || 0), 0);
+  // pendiente de liquidar por vendedor
+  const pend = new Map();
+  altasCache.filter(a => !a.liquidada).forEach(a => { const k = a.vendedorEmail; const o = pend.get(k) || { n: 0, total: 0, nombre: a.vendedor || k }; o.n++; o.total += a.comision || 0; pend.set(k, o); });
+  const pagados = new Set(altasCache.map(a => a.envioId));
+  porCobrar = enviosCache.filter(e => e.id && !pagados.has(e.id) && e.ts && Date.now() - e.ts < DIAS_POR_COBRAR * 86400000).slice(0, 40);
+  const cobradas = altasCache.slice().sort((a, b) => b.pagadoTs - a.pagadoTs).slice(0, 30);
+  box.innerHTML = `
+    <h2>Este mes</h2>
+    <div class="kpis">
+      <div class="kpi"><b>${delMes.length}</b><small>altas cobradas</small></div>
+      <div class="kpi"><b>${$$(brutoMes)}</b><small>cobrado en altas</small></div>
+      <div class="kpi"><b>${$$(comMes)}</b><small>comisiones de vendedores</small></div>
+      <div class="kpi"><b>${$$(brutoMes - comMes)}</b><small>te queda (sin soporte mensual)</small></div>
+    </div>
+    <h2>Comisiones a liquidar</h2>
+    ${pend.size ? [...pend.entries()].map(([email, o]) => `<div class="cob"><b>${esc(o.nombre)}</b>
+      <small>${o.n} ${o.n === 1 ? 'alta' : 'altas'} sin liquidar · <b style="display:inline">${$$(o.total)}</b></small>
+      <div class="acc"><button class="b2" onclick="liquidarVend('${esc(email)}')">✅ Ya le pagué</button><button class="b3" onclick="avisarVend('${esc(email)}')">💬 Avisarle</button></div></div>`).join('')
+      : '<div class="ok">No hay comisiones pendientes de liquidar.</div>'}
+    <h2>Por cobrar (últimos ${DIAS_POR_COBRAR} días)</h2>
+    ${porCobrar.length ? porCobrar.map((e, i) => { const st = estadoPrueba(e, null); return `<div class="cob">
+      <b>${esc(e.cliente || telBonito(e.telefono))}</b>
+      <small>${esc(e.app)} · ${esc(e.vendedor || e.vendedorEmail)} · enviada el ${fechaDia(e.ts)}${e.cliente ? ' · ' + esc(telBonito(e.telefono)) : ''}</small>
+      <span class="est ${st.cls}">${st.txt}</span>
+      <div class="acc"><button class="b1" onclick="marcarPago(${i},'basico')">Cobrado Básico ${$$(PLANES.basico.monto)}</button><button class="b2" onclick="marcarPago(${i},'full')">Cobrado Full ${$$(PLANES.full.monto)}</button></div></div>`; }).join('')
+      : '<p style="color:var(--mut)">No hay clientes por cobrar en este período.</p>'}
+    <h2>Altas cobradas</h2>
+    ${cobradas.length ? cobradas.map(a => `<div class="vend"><div><b>${esc(a.cliente || telBonito(a.telefono) || a.app)}</b> · ${esc(a.app)}<small>${esc(a.vendedor || a.vendedorEmail)} · ${fechaDia(a.pagadoTs)} · ${esc((PLANES[a.plan] || {}).n || a.plan)} ${$$(a.monto)} · comisión ${$$(a.comision)} ${a.liquidada ? '(liquidada)' : '(pendiente)'}</small></div>
+      ${a.liquidada ? '' : `<button class="mini" onclick="deshacerCobro('${esc(a.envioId)}')">↩ Deshacer</button>`}</div>`).join('') : '<p style="color:var(--mut)">Todavía no hay altas cobradas.</p>'}
+    <button class="btn sec" onclick="bajarCSVAltas()">⬇ Descargar planilla de comisiones (CSV)</button>`;
+}
+window.marcarPago = async (i, plan) => {
+  const e = porCobrar[i]; if (!e || !PLANES[plan]) return;
+  const nom = e.cliente || telBonito(e.telefono);
+  if (!confirm('¿Confirmás que ' + nom + ' pagó el alta del plan ' + PLANES[plan].n + ' (' + $$(PLANES[plan].monto) + ')?\nLa comisión de ' + (e.vendedor || e.vendedorEmail) + ' será ' + $$(comisionDe(plan)) + '.')) return;
+  try {
+    await datos.marcarAlta({ envioId: e.id, vendedorEmail: e.vendedorEmail, vendedor: e.vendedor || '', codigo: e.codigo || '', appId: e.appId || '', app: e.app || '', cliente: e.cliente || '', telefono: e.telefono || '', plan, monto: PLANES[plan].monto, comisionPct: COMISION_PCT, comision: comisionDe(plan), liquidada: false });
+  } catch (err) { alert('No se pudo guardar: ' + (err.code || err.message)); }
+  await pintarCobranza();
+};
+window.liquidarVend = async email => {
+  const lista = altasCache.filter(a => a.vendedorEmail === email && !a.liquidada); if (!lista.length) return;
+  const total = lista.reduce((n, a) => n + (a.comision || 0), 0);
+  if (!confirm('¿Confirmás que ya le pagaste ' + $$(total) + ' a ' + (lista[0].vendedor || email) + ' por ' + lista.length + (lista.length === 1 ? ' alta?' : ' altas?'))) return;
+  try { for (const a of lista) await datos.liquidarAlta(a.envioId); } catch (err) { alert('No se pudo guardar: ' + (err.code || err.message)); }
+  await pintarCobranza();
+};
+window.avisarVend = email => {
+  const lista = altasCache.filter(a => a.vendedorEmail === email && !a.liquidada); if (!lista.length) return;
+  const v = vendCache.find(x => x.email === email) || {}, total = lista.reduce((n, a) => n + (a.comision || 0), 0);
+  const msg = 'Hola ' + (v.nombre || '') + '! Te aviso que tus comisiones pendientes son ' + $$(total) + ' por ' + lista.length + (lista.length === 1 ? ' alta cobrada' : ' altas cobradas') + '. Te las liquido en estos días. Podés ver el detalle en «Mis ventas» dentro de la app.';
+  window.open('https://wa.me/' + (v.telefono || '') + '?text=' + encodeURIComponent(msg), '_blank');
+};
+window.deshacerCobro = async id => {
+  const a = altasCache.find(x => x.envioId === id); if (!a || a.liquidada) return;
+  if (!confirm('¿Deshacer el cobro de ' + (a.cliente || telBonito(a.telefono) || a.app) + '? Vuelve a la lista de «Por cobrar» y se quita su comisión.')) return;
+  try { await datos.deshacerAlta(id); } catch (err) { alert('No se pudo deshacer: ' + (err.code || err.message)); }
+  await pintarCobranza();
+};
+window.bajarCSVAltas = () => {
+  const q = x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
+  const f = ms => ms ? new Date(ms).toLocaleString('es-AR') : '';
+  const filas = [['Fecha de pago', 'Vendedor', 'Código', 'App', 'Cliente', 'Teléfono', 'Plan', 'Alta', 'Comisión %', 'Comisión', 'Liquidada', 'Fecha de liquidación']].concat(
+    altasCache.slice().sort((a, b) => b.pagadoTs - a.pagadoTs).map(a => [f(a.pagadoTs), a.vendedor, a.codigo, a.app, a.cliente, a.telefono, (PLANES[a.plan] || {}).n || a.plan, a.monto, a.comisionPct, a.comision, a.liquidada ? 'Sí' : 'No', f(a.liquidadaTs)]));
+  const csv = '﻿' + filas.map(r => r.map(q).join(';')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'), d = new Date();
+  a.href = URL.createObjectURL(blob);
+  a.download = 'comisiones-vendedores-' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+};
 
 /* ═════════ ARRANQUE ═════════ */
 (async function () {
