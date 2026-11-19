@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
   ARCHIVO: vendedores/index.html
-  VERSIÓN: v2.4
+  VERSIÓN: v2.5
   FECHA: 14/11/2026
   PROYECTO: RavenTechs — App para vendedores
   CHANGELOG:
+  - v2.5 (18/11/2026): catálogo: se suma GastAr (gastos del hogar, plan personal y Plus grupo familiar) como «Próximamente»; falta cargar la clave de avisos y decidir su venta. No toca vendedores, envíos ni cobranza.
   - v2.4 (14/11/2026): VIDEOS DE VENTA. Las apps de caja con sucursales (CarneAR, PizzAR, PanAR, PuntoVenta, lavAR, BarbeAR, PeloteAR) tienen dos videos (Básica con sucursales y Completa) en ventas.raventechsapp.com/videos/. En la ficha: botón «🎬 Videos» y en el envío un selector «Qué le mando» (prueba gratis / video Básica / video Completa) que arma el mensaje de WhatsApp con el link del video. El envío del video se registra con tipo «video» y NO genera tareas de seguimiento. Incluye la v2.3 (Cobranza y Mis ventas).
   - v2.3 (09/11/2026): COBRANZA Y COMISIONES. El admin tiene la solapa «Cobranza»: lista de clientes por cobrar con estado de la prueba (día X de 14), botones «Cobrado Básico» / «Cobrado Full» (sin escribir montos), comisión del vendedor calculada sola (40% del alta), liquidación mensual con un botón por vendedor, aviso por WhatsApp, deshacer un cobro por error y planilla CSV. Cada vendedor tiene «Mis ventas»: sus clientes, en qué estado está cada prueba, cuántos pagaron y cuánta comisión tiene pendiente o ya liquidada. Requiere reglas nuevas (colección altas). No modifica envíos, vendedores, visitas ni seguimientos existentes.
   - v2.2 (08/11/2026): el Admin tiene dos solapas: «Ventas» (lo de siempre) y «Uso de las apps», que abre el Panel de actividad (usuarios, accesos y copias de datos de cada app). No toca datos.
@@ -285,6 +286,10 @@ const APPS = [
     d:'Una agenda compartida para familias, equipos o grupos, con actividades en común, recordatorios y cada integrante con su propia agenda.',
     b:['Actividades del grupo en un solo lugar','Recordatorios','Agenda personal de cada integrante'],
     url:D('miagenda'), demo:D('miagenda'), ficha:'https://ventas.raventechsapp.com/folletos/folleto-miagenda.html', ayuda:D('miagenda')+'ayuda/' },
+  { id:'gastar', n:'GastAr', e:'💸', r:'Hogar', t:'Gastos del hogar con vencimientos y avisos', ok:false,
+    d:'Los gastos y vencimientos de la casa en un solo lugar: alquiler, servicios y tarjetas, con aviso antes de cada vencimiento. Plan personal, o Plus grupo familiar para compartir con la pareja o la familia (hasta 5 personas).',
+    b:['Vencimientos ordenados por color y avisos en el celular','Cada gasto marcado como fijo, opcional o innecesario','Plus grupo familiar: hasta 5 personas con los mismos gastos'],
+    url:'https://raventechs.github.io/Gastar/', demo:'https://raventechs.github.io/Gastar/?demo', ficha:'https://raventechs.github.io/Gastar/ayuda/', ayuda:'https://raventechs.github.io/Gastar/ayuda/' },
   { id:'habitos', n:'Traductor de Hábitos', e:'🧬', r:'Personas', t:'Registro y análisis de hábitos con IA', ok:false,
     d:'Registrá tus hábitos hablando o escribiendo (sueño, comida, ánimo, actividad, pulso) y descubrí cómo se relacionan entre sí, con observaciones sin juicios.',
     b:['Registro por voz o texto','Descubre patrones entre tus hábitos','Perfil que crece con cada registro'],
